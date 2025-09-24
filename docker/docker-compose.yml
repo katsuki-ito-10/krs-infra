@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: kairos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kairos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kairos}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}      # 既定DB。keycloak 用は後述の手動作成
+      TZ: Asia/Tokyo
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - ${PGDATA_VOLUME:-pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kairos} -d ${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.2
+    container_name: keycloak
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KC_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${POSTGRES_USER:-kairos}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-kairos}
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    command: ["start-dev"]
+    ports:
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
+
+volumes:
+  pgdata: {}
